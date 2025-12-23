@@ -1,0 +1,212 @@
+                if (!currentText) return;
+
+                if (!isTyping) {
+                    isTyping = true;
+                    startTime = new Date();
+
+                    // Start TTS if enabled on first stroke
+                    if (ttsEnabled && currentIndex === 0) {
+                        currentSentenceIdx = 0;
+                        speakSentence(0);
+                        nextSentenceTriggered = false;
+                    }
+                }
+
+                const charSpans = textDisplay.querySelectorAll('.char');
+
+                if (e.inputType === 'deleteContentBackward') {
+                    // Handle Backspace
+                    if (currentIndex > 0) {
+                        charSpans[currentIndex].classList.remove('current');
+                        currentIndex--;
+                        // Skip back over newlines
+                        while (currentIndex > 0 && currentText[currentIndex] === '\n') {
+                            currentIndex--;
+                        }
+                        charSpans[currentIndex].classList.remove('correct', 'incorrect');
+                        charSpans[currentIndex].classList.add('current');
+                    }
+                } else if (e.data) {
+                    // Handle typed character(s)
+                    const typedChars = e.data.split('');
+
+                    for (const typedChar of typedChars) {
+                        if (currentIndex >= currentText.length) break;
+
+                        // Auto-skip newlines in target text
+                        while (currentIndex < currentText.length && currentText[currentIndex] === '\n') {
+                            // Mark newline as done (optional, maybe just skip)
+                            // charSpans[currentIndex].classList.add('correct'); 
+                            currentIndex++;
+                        }
+
+                        if (currentIndex >= currentText.length) break;
+
+                        const targetChar = currentText[currentIndex];
+                        const charSpan = charSpans[currentIndex];
+
+                        if (typedChar === targetChar) {
+                            charSpan.classList.add('correct');
+                        } else {
+                            charSpan.classList.add('incorrect');
+                            errors++;
+                        }
+
+                        charSpan.classList.remove('current');
+                        currentIndex++;
+
+                        // Prepare next char
+                        // Skip newlines for next char too
+                        while (currentIndex < currentText.length && currentText[currentIndex] === '\n') {
+                            currentIndex++;
+                        }
+
+                        if (currentIndex < currentText.length) {
+                            charSpans[currentIndex].classList.add('current');
+
+                            // Scroll into view
+                            const currentEl = charSpans[currentIndex];
+                            // If currentEl is hidden newline, this might fail.
+                            // But we skipped newlines, so currentEl should be a visible char.
+                            if (currentEl) {
+                                const container = textDisplay;
+                                if (currentEl.offsetTop > container.scrollTop + container.clientHeight - 50) {
+                                    container.scrollTop = currentEl.offsetTop - 50;
+                                }
+                            }
+
+                            if (ttsEnabled && sentenceSegments.length > 0) {
+                                const currentSeg = sentenceSegments[currentSentenceIdx];
+                                if (currentSeg) {
+                                    // 1. Reset trigger if we physically arrived in the triggered sentence
+                                    const actualSegIdx = sentenceSegments.findIndex(s => currentIndex >= s.index && currentIndex < s.end);
+                                    if (actualSegIdx !== -1) {
+                                        if (actualSegIdx === currentSentenceIdx && nextSentenceTriggered) {
+                                            // We arrived! Reset flag.
+                                            nextSentenceTriggered = false;
+                                        }
+                                        // Catch-up logic (e.g. jumped ahead by mouse/paste?)
+                                        if (actualSegIdx > currentSentenceIdx) {
+                                            window.speechSynthesis.cancel();
+                                            currentSentenceIdx = actualSegIdx;
+                                            speakSentence(currentSentenceIdx);
+                                            nextSentenceTriggered = false;
+                                        }
+                                    }
+
+                                    // 2. Trigger next sentence if close to end
+                                    // Re-fetch currentSeg in case catch-up changed it
+                                    const activeSeg = sentenceSegments[currentSentenceIdx];
+                                    if (activeSeg) {
+                                         const charsLeftInSentence = activeSeg.end - currentIndex;
+                                         if (charsLeftInSentence < 8 && !nextSentenceTriggered) {
+                                             if (currentSentenceIdx + 1 < sentenceSegments.length) {
+                                                 currentSentenceIdx++;
+                                                 speakSentence(currentSentenceIdx);
+                                                 nextSentenceTriggered = true;
+                                             }
+                                         }
+                                    }
+                                }
+                            }
+                                                 } else {
+                                                     currentSentenceIdx = actualSegIdx;
+                                                 }
+                                                 nextSentenceTriggered = false;
+                                             }
+                                         }
+                                    }
+                                }
+                            }
+
+                            // TTS Trigger Logic
+                            if (ttsEnabled && sentenceSegments.length > 0) {
+                                // Check if we are approaching the end of the current sentence
+                                const currentSeg = sentenceSegments[currentSentenceIdx];
+                                if (currentSeg) {
+                                    const charsLeftInSentence = currentSeg.end - currentIndex;
+                                    // Trigger if we are close to end (e.g. < 5 chars) AND we haven't triggered next yet
+                                    // Also ensure we don't trigger if we are already past this sentence (integrity check)
+
+                                    if (charsLeftInSentence < 8 && !nextSentenceTriggered) {
+                                        // "Waits until the user almost finished"
+                                        // We trigger the next one now. 
+                                        // Using speech queue, if previous is still speaking, it waits.
+                                        // If previous finished, it starts now.
+                                        currentSentenceIdx++;
+                                        if (currentSentenceIdx < sentenceSegments.length) {
+                                            speakSentence(currentSentenceIdx);
+                                            nextSentenceTriggered = true;
+                                        }
+                                    }
+
+                                    // If we moved past the sentence boundary significantly, reset trigger for safety
+                                    // (Handled by incrementing currentSentenceIdx above)
+                                    // But what if user is typing very fast and skips the check?
+                                    // We should check: does currentIndex fall into next sentence?
+                                    if (currentIndex >= currentSeg.end) {
+                                        // We are in the next sentence.
+                                        // If we didn't trigger, we should have. 
+                                        // Correct our index.
+                                        const actualSegIdx = sentenceSegments.findIndex(s => currentIndex >= s.index && currentIndex < s.end);
+                                        if (actualSegIdx !== -1 && actualSegIdx !== currentSentenceIdx) {
+                                            // We jumped? Or just missed trigger.
+                                            // If we missed trigger, speak ONLY if not already triggered/speaking corresponding one.
+                                            // Actually, simpler: just ensure we are tracking the right sentence.
+
+                                            // If we are deep into a new sentence and haven't spoken it, speak it?
+                                            // But logic above tries to anticipate.
+
+                                            // Reset trigger flag if we entered a new sentence
+                                            if (actualSegIdx > currentSentenceIdx) {
+                                                // Should have triggered. Trigger now immediately?
+                                                if (!nextSentenceTriggered) {
+                                                    // Missed the window (maybe pasted text?), speak now
+                                                    window.speechSynthesis.cancel(); // catch up
+                                                    currentSentenceIdx = actualSegIdx;
+                                                    speakSentence(currentSentenceIdx);
+                                                    // Queue next? No, wait for window.
+                                                } else {
+                                                    // Already triggered, just update index
+                                                    currentSentenceIdx = actualSegIdx;
+                                                }
+                                                nextSentenceTriggered = false;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Finished
+                            isTyping = false;
+                            alert(`Fertig! WPM: ${calculateWPM()}, Genauigkeit: ${calculateAccuracy()}% `);
+                            break;
+                        }
+                    }
+                }
+
+                updateStats();
+                hiddenInput.value = '';
+            });
+
+            function updateStats() {
+                wpmDisplay.textContent = `${calculateWPM()} WPM`;
+                accuracyDisplay.textContent = `${calculateAccuracy()}% Acc`;
+            }
+
+            function calculateWPM() {
+                if (!startTime) return 0;
+                const timeElapsed = (new Date() - startTime) / 1000 / 60; // in minutes
+                if (timeElapsed === 0) return 0;
+                const words = currentIndex / 5;
+                return Math.round(words / timeElapsed);
+            }
+
+            function calculateAccuracy() {
+                if (currentIndex === 0) return 100;
+                let acc = Math.round(((currentIndex - errors) / currentIndex) * 100);
+                if (acc < 0) acc = 0;
+                return acc;
+            }
+        });
+    </script>
