@@ -132,18 +132,16 @@
             user-select: none;
             white-space: pre-wrap;
             max-height: 60vh;
-            overflow-y: auto;
+            overflow-y: scroll;
+            scrollbar-gutter: stable;
             padding-right: 1rem;
-            /* Hide scrollbar for cleaner look */
-            scrollbar-width: none;
-        }
-
-        .text-display::-webkit-scrollbar {
-            display: none;
+            scrollbar-color: var(--accent-color) var(--input-bg);
+            scrollbar-width: auto;
         }
 
         .char {
             transition: color 0.1s;
+            color: var(--subtle-color);
         }
 
         .char.correct {
@@ -159,9 +157,11 @@
             background-color: rgba(212, 175, 55, 0.2);
             border-bottom: 2px solid var(--accent-color);
             color: var(--text-color);
+            font-weight: bold;
         }
 
         #hidden-input {
+            z-index: -1;
             position: absolute;
             opacity: 0;
             top: 0;
@@ -185,7 +185,7 @@
         }
 
 
-        
+
         /* Settings Dialog */
         dialog.settings-dialog {
             background-color: var(--bg-color);
@@ -193,12 +193,12 @@
             border: 1px solid var(--subtle-color);
             border-radius: 8px;
             padding: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
             max-width: 400px;
             width: 90%;
             margin: auto;
         }
-        
+
         dialog::backdrop {
             background: rgba(0, 0, 0, 0.5);
         }
@@ -214,7 +214,8 @@
             color: var(--subtle-color);
         }
 
-        .setting-group select, .setting-group input {
+        .setting-group select,
+        .setting-group input {
             width: 100%;
         }
 
@@ -226,6 +227,7 @@
             border-radius: 4px;
             cursor: pointer;
         }
+
         .close-btn:hover {
             border-color: var(--accent-color);
         }
@@ -247,6 +249,19 @@
             --subtle-color: #a38154;
             --correct-color: #81c784;
             --incorrect-color: #ff4747;
+        }
+        /* Custom Scrollbar for WebKit */
+        .text-display::-webkit-scrollbar {
+            width: 12px;
+            display: block;
+        }
+        .text-display::-webkit-scrollbar-track {
+            background: var(--input-bg);
+        }
+        .text-display::-webkit-scrollbar-thumb {
+            background-color: var(--accent-color);
+            border-radius: 6px;
+            border: 3px solid var(--input-bg);
         }
     </style>
 
@@ -278,7 +293,9 @@
                     <input type="checkbox" id="tts-toggle">
                     <span>Vorlesen</span>
                 </label>
-                <button id="tts-settings-btn" style="background:none; border:none; color:var(--subtle-color); cursor:pointer; font-size: 1.2rem; margin-left: 0.5rem;" title="Spracheinstellungen">⚙️</button>
+                <button id="tts-settings-btn"
+                    style="background:none; border:none; color:var(--subtle-color); cursor:pointer; font-size: 1.2rem; margin-left: 0.5rem;"
+                    title="Spracheinstellungen">⚙️</button>
                 <select id="theme-select" style="margin-left: 1rem;">
                     <option value="dark">Dark</option>
                     <option value="light">Light</option>
@@ -299,7 +316,7 @@
             </div>
         </main>
 
-        
+
         <dialog id="tts-settings-dialog" class="settings-dialog">
             <h3>Spracheinstellungen</h3>
             <div class="setting-group">
@@ -330,11 +347,13 @@
             const chapterSelect = document.getElementById('chapter-select');
             const textDisplay = document.getElementById('text-display');
             const hiddenInput = document.getElementById('hidden-input');
+            const typingArea = document.getElementById('typing-area');
+            typingArea.addEventListener('click', () => hiddenInput.focus());
             const wpmDisplay = document.getElementById('wpm');
             const accuracyDisplay = document.getElementById('accuracy');
             const themeSelect = document.getElementById('theme-select');
-                        const ttsToggle = document.getElementById('tts-toggle');
-            
+            const ttsToggle = document.getElementById('tts-toggle');
+
             // Settings Elements
             const ttsSettingsBtn = document.getElementById('tts-settings-btn');
             const ttsSettingsDialog = document.getElementById('tts-settings-dialog');
@@ -349,7 +368,7 @@
             let ttsRate = parseFloat(localStorage.getItem('tts-rate')) || 1.0;
             let ttsPitch = parseFloat(localStorage.getItem('tts-pitch')) || 1.0;
             let ttsVoiceURI = localStorage.getItem('tts-voice-uri') || '';
-            
+
             // Init Inputs
             ttsRateInput.value = ttsRate;
             ttsRateValue.textContent = ttsRate;
@@ -38150,11 +38169,11 @@ Offb 22, 21 Die Gnade des Herrn Jesus sei mit allen!
                 const allVoices = window.speechSynthesis.getVoices();
                 let selectedVoice = allVoices.find(v => v.voiceURI === ttsVoiceURI);
                 if (!selectedVoice) {
-                     // Fallback
-                     selectedVoice = allVoices.find(v => v.lang.startsWith('de'));
+                    // Fallback
+                    selectedVoice = allVoices.find(v => v.lang.startsWith('de'));
                 }
                 if (selectedVoice) utterance.voice = selectedVoice;
-                
+
                 utterance.rate = ttsRate;
                 utterance.pitch = ttsPitch;
 
@@ -38321,14 +38340,14 @@ Offb 22, 21 Die Gnade des Herrn Jesus sei mit allen!
                                     // Re-fetch currentSeg in case catch-up changed it
                                     const activeSeg = sentenceSegments[currentSentenceIdx];
                                     if (activeSeg) {
-                                         const charsLeftInSentence = activeSeg.end - currentIndex;
-                                         if (charsLeftInSentence < 8 && !nextSentenceTriggered) {
-                                             if (currentSentenceIdx + 1 < sentenceSegments.length) {
-                                                 currentSentenceIdx++;
-                                                 speakSentence(currentSentenceIdx);
-                                                 nextSentenceTriggered = true;
-                                             }
-                                         }
+                                        const charsLeftInSentence = activeSeg.end - currentIndex;
+                                        if (charsLeftInSentence < 8 && !nextSentenceTriggered) {
+                                            if (currentSentenceIdx + 1 < sentenceSegments.length) {
+                                                currentSentenceIdx++;
+                                                speakSentence(currentSentenceIdx);
+                                                nextSentenceTriggered = true;
+                                            }
+                                        }
                                     }
                                 }
                             }
